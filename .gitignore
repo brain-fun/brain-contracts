@@ -1,0 +1,9 @@
+node_modules/
+cache/
+artifacts/
+typechain-types/
+*.log
+.next/
+scripts/
+test/
+FINAL_REPORT.md
