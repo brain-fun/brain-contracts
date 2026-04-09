@@ -26,19 +26,6 @@ brain.fun lets anyone launch a token in seconds on the Bittensor network. Each t
 
 ---
 
-## Versions
-
-brain.fun ships in two factory versions running side-by-side on mainnet:
-
-| Version | Status | Notes |
-|---------|--------|-------|
-| **V1** | Legacy | Original factory. Existing tokens stay here and remain fully tradable + claimable. |
-| **V2** | Current | Audit-hardened release. All new launches go through V2. |
-
-V2 is a strict security upgrade — same AMM, same parameters, no migration required for existing tokens. See [Audit Fixes](#audit-fixes) for the full delta.
-
----
-
 ## Contracts
 
 ### BrainFactory
@@ -49,11 +36,8 @@ The factory deploys new Token contracts and manages the creator + protocol fee p
 |----------|-------------|
 | `createToken(name, symbol, metadata)` | Deploy a new token. Send TAO to make an initial buy in the same tx (frontrun-protected). |
 | `claimCreatorFees()` | Withdraw accumulated creator earnings (pull pattern). |
-| `claimProtocolFees()` | Owner-only: withdraw accumulated protocol fees (pull pattern, V2). |
-| `depositProtocolFee()` | Internal hook called by Token contracts to credit protocol fees (V2). |
+| `claimProtocolFees()` | Owner-only: withdraw accumulated protocol fees (pull pattern). |
 | `getFees()` | Returns the immutable fee rates. |
-
-Fees and virtual reserve are `immutable` in V2 — there are no `setFees` or `setVirtualReserve` setters.
 
 ### Token
 
@@ -94,7 +78,7 @@ k = effectiveTao * tokenReserve
 
 - **Virtual reserve** provides initial liquidity without requiring upfront capital.
 - **Rounding is always against the trader** — the pool's `k` value never decreases, preventing value extraction through dust trades.
-- **Sell cap** — If a sell would exceed available TAO, the output is capped while the token reserve is preserved (V2 fix for H-01).
+- **Sell cap** — If a sell would exceed available TAO, the output is capped while the token reserve is preserved.
 
 ---
 
@@ -106,22 +90,8 @@ k = effectiveTao * tokenReserve
 - **Transfer guards** — Cannot transfer tokens to `address(0)` or to the token contract itself.
 - **Balance validation** before every sell.
 - **Pull pattern** for both creator and protocol fees — fees accumulate in the Factory and are claimed explicitly, avoiding push-based reentrancy and gas-griefing vectors.
-- **Existential Deposit guard** — Claim functions cap withdrawals to the actual factory balance, surviving Bittensor EVM's ED quirks ([subtensor #1352](https://github.com/opentensor/subtensor/issues/1352)).
 - **Immutable economics** — Fee rates and virtual reserve are `immutable`, removing every admin lever over live token economics.
 - **Fee precision** — Single-step fee calculation to avoid compounding rounding errors.
-
-### Audit Fixes (V1 → V2)
-
-V2 addresses every finding from the security audit:
-
-| ID | Severity | Fix |
-|----|----------|-----|
-| H-01 | High | Sell cap path no longer recalculates `newTokenReserve`, eliminating phantom token inflation. |
-| H-02 | High | Protocol fees switched to pull pattern via `depositProtocolFee` / `claimProtocolFees`, removing the push-path DoS vector. |
-| M-01 | Medium | Fee rates made `immutable` — no owner can change fees mid-flight. |
-| M-03 | Medium | Existential Deposit guard added to all claim paths. |
-| L-02, L-04 | Low | `nonReentrant` extended to `createToken`, `claim*`, and `rescueTAO`. |
-| L-05, L-07 | Low | `virtualReserve`, `totalFeeRate`, `deployerFeeRate` declared `immutable`. |
 
 ---
 
